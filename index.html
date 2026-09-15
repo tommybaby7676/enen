@@ -18,22 +18,12 @@
         .phone-container {
             position: relative;
             width: 100%;
-            max-width: 430px; /* 模擬手機寬度 */
+            max-width: 430px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         .phone-container img {
             width: 100%;
             display: block;
-        }
-        /* 透明可點擊熱區樣式 */
-        .hotspot {
-            position: absolute;
-            cursor: pointer;
-            background: rgba(255, 255, 255, 0); /* 測試時可改成 0.3 看位置 */
-            transition: background 0.2s;
-        }
-        .hotspot:hover {
-            background: rgba(255, 215, 0, 0.2); /* 懸停時發出淡淡金光，增加互動感 */
         }
         .back-btn {
             position: absolute;
@@ -46,6 +36,7 @@
             text-decoration: none;
             font-weight: bold;
             display: none;
+            z-index: 10;
         }
     </style>
 </head>
@@ -53,55 +44,26 @@
 
     <div class="phone-container" id="app">
         <a href="#" class="back-btn" id="backBtn" onclick="switchPage('home')">← 返回首頁</a>
-        <img id="screenImg" src="你的首頁圖片檔名.png" alt="Portfolio Screen">
-        
-        <!-- 點擊熱區容器 -->
+        <!-- 請確認這裡的圖片檔名與你資料夾裡的檔名完全一致 -->
+        <img id="screenImg" src="home.png" alt="Portfolio Screen">
         <div id="hotspotsContainer"></div>
     </div>
 
     <script>
-        // 頁面資料對照表（你可以把圖片放到 GitHub 專案裡）
         const pages = {
             'home': {
-                img: 'home.png', // 第一張總覽首頁
+                img: 'home.png', // 首頁圖片檔名
                 spots: [
-                    { top: '65%', left: '10%', width: '80%', height: '8%', action: 'slot' }, // 假設點這裡去 SLOT 頁
-                    { top: '75%', left: '10%', width: '80%', height: '8%', action: 'mate369' } // 點這裡去 MATE369 作品
+                    // 這裡之後可以調整按鈕的位置與點擊後跳轉的頁面
                 ]
-            },
-            'slot': {
-                img: '369_slot.png', // 對應你截圖裡的 slot 頁面
-                spots: []
-            },
-            'mate369': {
-                img: '369_作品長圖.png', // 對應你長條狀的詳細作品圖
-                spots: []
             }
         };
 
         function switchPage(pageKey) {
             const page = pages[pageKey];
+            if (!page) return;
             document.getElementById('screenImg').src = page.img;
-            
-            const container = document.getElementById('hotspotsContainer');
-            container.innerHTML = ''; // 清空舊熱區
-
-            // 顯示或隱藏返回鍵
             document.getElementById('backBtn').style.display = (pageKey === 'home') ? 'none' : 'block';
-
-            // 動態生成可點擊熱區
-            page.spots.forEach(spot => {
-                const div = document.createElement('div');
-                div.className = 'spot';
-                div.style.top = spot.top;
-                div.style.left = spot.left;
-                div.style.width = spot.width;
-                div.style.height = spot.height;
-                div.style.position = 'absolute';
-                div.style.cursor = 'pointer';
-                div.onclick = () => switchPage(spot.action);
-                container.appendChild(div);
-            });
         }
     </script>
 </body>
