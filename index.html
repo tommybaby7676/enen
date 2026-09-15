@@ -1,329 +1,430 @@
-
 <!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MATE369 - Australian iGaming Platform</title>
+    
+    <!-- 引入 Google Fonts 提升排版質感 (Playfair Display 與 Outfit) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#071a0c] text-white antialiased">
+    <!-- React 應用程式掛載點 -->
+    <div id="root"></div>
+
+    <!-- 主程式進入點 -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+{
+  "name": "figma-make-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "format": "oxfmt"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "oxfmt": "^0.2.0",
+    "typescript": "^5.7.0",
+    "vite": "^8.0.5"
+  }
+}
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["node"],
+    "strict": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src", "vite.config.ts"]
+}
+import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import path from 'node:path'
+
+import siteConfiguration from './.figma/make/site.json'
+
+// Vite config — https://vitejs.dev/config/
+export default defineConfig(({ mode }) => {
+  // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
+  const emitSourcemaps = mode === 'development'
+
+  return {
+    base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
+    build: {
+      sourcemap: emitSourcemaps ? 'inline' : false,
+      minify: !emitSourcemaps,
+    },
+    plugins: [
+      react(),
+      tailwindcss(),
+      figmaSiteConfiguration(siteConfiguration),
+      figmaErrorOverlayReplay(),
+      figmaReactRefreshBoundaryFallback(),
+      figmaMakeKitPlugin({ storiesGlob: '/src/**/*.stories.{ts,tsx,js,jsx}' }),
+    ],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
+    },
+    server: {
+      host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
+      port: parseInt(process.env.PORT || '8443'),
+      strictPort: true,
+      watch: {
+        ignored: [
+          '**/.figma/**',
+],
+      },
+    },
+    preview: {
+      host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
+      port: parseInt(process.env.PORT || '8443'),
+    },
+  }
+})
+
+type FigmaSiteConfiguration = {
+  title?: string
+  description?: string
+  language?: string
+  robots?: {
+    index?: boolean
+  }
+  icons?: {
+    icon?: string
+  }
+  openGraph?: {
+    image?: string
+  }
+  analytics?: {
+    googleAnalyticsId?: string
+  }
+  customScripts?: {
+    headStart?: string
+    headEnd?: string
+    bodyStart?: string
+    bodyEnd?: string
+  }
+  accessibility?: {
+    addBypassLinks?: boolean
+  }
+}
+
+/** Applies /.figma/make/site.json to the generated document shell. */
+function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
+  function sanitizeHtmlValue(value: string | undefined): string {
+    return value?.replace(/[^a-zA-Z0-9_-]/g, '') || ''
+  }
+  function escapeHtmlText(value: string): string {
+    return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  }
+  function replaceHtmlCommentSlot(html: string, slotName: string, content: string): string {
+    return html.replace(`<!-- ${slotName} -->`, content)
+  }
+
+  const title = config.title ?? "Figma Make App"
+  const description = config.description ?? ''
+  const favicon = config.icons?.icon ?? ''
+  const socialImage = config.openGraph?.image ?? ''
+  const language = sanitizeHtmlValue(config.language) || 'en'
+  const googleAnalyticsId = sanitizeHtmlValue(config.analytics?.googleAnalyticsId)
+  const headStart = config.customScripts?.headStart ?? ''
+  const headEnd = config.customScripts?.headEnd ?? ''
+  const bodyStart = config.customScripts?.bodyStart ?? ''
+  const bodyEnd = config.customScripts?.bodyEnd ?? ''
+  const robotsTxt = config.robots?.index === false ? 'User-agent: *\nDisallow: /\n' : ''
+
+  return {
+    name: 'figma-site-configuration',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!robotsTxt || req.url?.split('?')[0] !== '/robots.txt') return next()
+
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+        res.end(robotsTxt)
+      })
+    },
+    generateBundle() {
+      if (!robotsTxt) return
+
+      this.emitFile({
+        type: 'asset',
+        fileName: 'robots.txt',
+        source: robotsTxt,
+      })
+    },
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html) {
+        let result = html
+        result = replaceHtmlCommentSlot(result, 'figma:lang', language)
+        result = replaceHtmlCommentSlot(result, 'figma:title', escapeHtmlText(title))
+        result = replaceHtmlCommentSlot(result, 'figma:head-start', headStart)
+        result = replaceHtmlCommentSlot(result, 'figma:head-end', headEnd)
+        result = replaceHtmlCommentSlot(result, 'figma:body-start', bodyStart)
+        result = replaceHtmlCommentSlot(result, 'figma:body-end', bodyEnd)
+
+        const tags: HtmlTagDescriptor[] = []
+        if (description) {
+          tags.push({ tag: 'meta', attrs: { name: 'description', content: description }, injectTo: 'head' })
+        }
+        if (config.robots?.index === false) {
+          tags.push({ tag: 'meta', attrs: { name: 'robots', content: 'noindex, nofollow' }, injectTo: 'head' })
+        }
+        if (favicon) {
+          tags.push({ tag: 'link', attrs: { rel: 'icon', href: favicon }, injectTo: 'head' })
+        }
+        if (title) {
+          tags.push({ tag: 'meta', attrs: { property: 'og:title', content: title }, injectTo: 'head' })
+        }
+        if (description) {
+          tags.push({ tag: 'meta', attrs: { property: 'og:description', content: description }, injectTo: 'head' })
+        }
+        if (socialImage) {
+          tags.push(
+            { tag: 'meta', attrs: { property: 'og:image', content: socialImage }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'twitter:image', content: socialImage }, injectTo: 'head' },
+          )
+        }
+
+        if (googleAnalyticsId) {
+          tags.push(
+            {
+              tag: 'script',
+              attrs: {
+                async: true,
+                src: `https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`,
+              },
+              injectTo: 'head',
+            },
+            {
+              tag: 'script',
+              children: `
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', ${JSON.stringify(googleAnalyticsId)});
+`,
+              injectTo: 'head',
+            },
+          )
+        }
+
+        if (config.accessibility?.addBypassLinks) {
+          tags.push(
+            {
+              tag: 'style',
+              children: `
+  .figma-bypass-link {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 2147483647;
+    transform: translateY(-150%);
+    border-radius: 6px;
+    background: #111827;
+    color: #fff;
+    padding: 8px 12px;
+    font: 600 14px/1.2 system-ui, sans-serif;
+    text-decoration: none;
+  }
+  .figma-bypass-link:focus {
+    transform: translateY(0);
+  }
+`,
+              injectTo: 'head',
+            },
+            {
+              tag: 'a',
+              attrs: { class: 'figma-bypass-link', href: '#root' },
+              children: 'Skip to content',
+              injectTo: 'body-prepend',
+            },
+          )
+        }
+
+        return {
+          html: result,
+          tags,
+        }
+      },
+    },
+  }
+}
+
+/**
+ * Replay the most recent build error to clients that connect after
+ * it was first broadcast. Vite buffers an error payload only while
+ * no clients are connected and clears the buffer on the first
+ * reconnect (see `bufferedMessage` in `createWebSocketServer`), so
+ * if the preview iframe reloads after Vite already delivered an
+ * error to a live socket, the new socket misses the payload and
+ * the overlay stays hidden even though the build is still broken.
+ * We intercept `ws.send` to remember the latest error and replay
+ * it on every new connection; the cache clears on a successful
+ * `update` or `full-reload` so a stale overlay can't survive a
+ * fixed build.
+ */
+function figmaErrorOverlayReplay(): Plugin {
+  return {
+    name: 'figma-error-overlay-replay',
+    apply: 'serve',
+    configureServer(server) {
+      let lastError: object | null = null
+
+      const origSend = server.ws.send.bind(server.ws) as (...args: any[]) => void
+      server.ws.send = ((...args: any[]) => {
+        const payload = args[0]
+        if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+          const type = (payload as { type?: string }).type
+          if (type === 'error') {
+            lastError = payload as object
+          } else if (type === 'update' || type === 'full-reload') {
+            lastError = null
+          }
+        }
+        return origSend(...args)
+      }) as typeof server.ws.send
+
+      server.ws.on('connection', (socket) => {
+        if (lastError !== null) {
+          socket.send(JSON.stringify(lastError))
+        }
+      })
+    },
+  }
+}
+
+/**
+ * Reload when a module that previously defined a React Refresh boundary stops
+ * defining one. This happens when an agent moves a component into a new file
+ * and replaces the old module with a re-export:
+ *
+ *   export { default } from './app/App'
+ *
+ * Vite otherwise accepts the update using the previous module's HMR boundary,
+ * but the re-export-only transform no longer registers a replacement for the
+ * mounted component family. React reports a successful refresh while leaving
+ * the old tree mounted until the page is reloaded.
+ */
+function figmaReactRefreshBoundaryFallback(): Plugin {
+  const hadRefreshBoundary = new Map<string, boolean>()
+  let sendFullReload: (() => void) | null = null
+
+  return {
+    name: 'figma-react-refresh-boundary-fallback',
+    apply: 'serve',
+    enforce: 'post',
+    configureServer(server) {
+      sendFullReload = () => server.ws.send({ type: 'full-reload', path: '*' })
+    },
+    transform(code, id) {
+      if (!/\.[jt]sx?(?:\?|$)/.test(id) || id.includes('/node_modules/')) return null
+
+      const moduleId = id.split('?')[0] ?? id
+      const hasRefreshBoundary = code.includes('registerExportsForReactRefresh')
+      const previousHadRefreshBoundary = hadRefreshBoundary.get(moduleId)
+      hadRefreshBoundary.set(moduleId, hasRefreshBoundary)
+
+      if (previousHadRefreshBoundary && !hasRefreshBoundary) {
+        queueMicrotask(() => sendFullReload?.())
+      }
+
+      return null
+    },
+  }
+}
+
+/**
+ * Serves a blank render-target page at /.figma/make/kit.html that
+ * the Figma preview script drives directly. The page exposes a
+ * registry of every file matching `storiesGlob` on
+ * window.__FIGMA__.stories so the design surface can dynamically
+ * import + mount each entry into its own grid view.
+ *
+ * Dev-only: `apply: 'serve'` gates the plugin to `vite dev`. Prod
+ * builds (`vite build`) skip it entirely so the route doesn't leak
+ * into shipped bundles.
+ */
+function figmaMakeKitPlugin(options: { storiesGlob: string | string[] }): Plugin {
+  const storiesGlob = Array.isArray(options.storiesGlob) ? options.storiesGlob : [options.storiesGlob]
+  const ROUTE = '/.figma/make/kit.html'
+  const VIRTUAL_ID = 'virtual:figma-stories'
+  const RESOLVED_ID = '\0' + VIRTUAL_ID
+  const STORIES_MODULE = `export const stories = import.meta.glob(${JSON.stringify(storiesGlob)})`
+  const HTML_BOOTSTRAP = `<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Aussie Life & Sports Pulse | Down Under Lifestyle Blog</title>
-  <meta name="description" content="Discover the best of Melbourne living: specialty coffee, brunch spots, AFL footy culture, and relaxing weekend lifestyle tips." />
-  <meta name="robots" content="index, follow" />
-
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "BlogPosting",
-    "headline": "How to Spend the Perfect Weekend in Melbourne: Brunch, Footy & Downtime",
-    "description": "A guide to the ultimate Melbourne weekend covering coffee culture, live footy excitement, and casual downtime.",
-    "author": {
-      "@type": "Organization",
-      "name": "Aussie Life & Sports Pulse"
-    },
-    "publisher": {
-      "@type": "Organization",
-      "name": "Aussie Life & Sports Pulse Ltd."
-    },
-    "datePublished": "2026-03-01",
-    "inLanguage": "en-AU"
-  }
-  </script>
-  
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-  
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f4f6f9;
-      color: #333;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      line-height: 1.6;
-    }
-
-    header {
-      background-color: #0b2240;
-      color: #fff;
-      padding: 16px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-
-    header h1 {
-      margin: 0;
-      font-size: 19px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-    }
-
-    .nav-links a {
-      color: #cbd5e1;
-      text-decoration: none;
-      font-size: 13px;
-      margin-left: 16px;
-      font-weight: 600;
-    }
-
-    .nav-links a:hover {
-      color: #38bdf8;
-    }
-
-    .container {
-      max-width: 650px;
-      margin: 24px auto;
-      padding: 0 16px;
-      flex: 1;
-    }
-
-    .main-box {
-      background: #fff;
-      border-radius: 14px;
-      padding: 28px 24px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-      border: 1px solid #e2e8f0;
-    }
-
-    .fun-image-section {
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    .image-wrapper {
-      width: 100%;
-      max-width: 280px;
-      margin: 0 auto;
-      aspect-ratio: 1 / 1;
-      overflow: hidden;
-      border-radius: 10px;
-      border: 1.5px dashed #0b2240;
-      background-color: #f8fafc;
-    }
-
-    .image-wrapper img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .hero-article {
-      text-align: left;
-    }
-
-    .hero-article h2 {
-      color: #0b2240;
-      margin-top: 0;
-      font-size: 21px;
-      font-weight: 800;
-      line-height: 1.35;
-      margin-bottom: 8px;
-    }
-
-    .meta-info {
-      color: #64748b;
-      font-size: 12px;
-      margin-bottom: 16px;
-      border-bottom: 1px solid #f1f5f9;
-      padding-bottom: 10px;
-    }
-
-    .content {
-      font-size: 14.5px;
-      color: #475569;
-    }
-
-    .content h3 {
-      font-size: 15.5px;
-      color: #0b2240;
-      margin: 16px 0 6px;
-      font-weight: 700;
-    }
-
-    .content p {
-      margin: 0 0 12px 0;
-    }
-
-    footer {
-      text-align: center;
-      padding: 24px 16px;
-      font-size: 11.5px;
-      color: #94a3b8;
-      background: #0b2240;
-      line-height: 1.8;
-    }
-
-    .footer-legal-links {
-      margin-bottom: 8px;
-    }
-
-    .footer-legal-links a {
-      color: #cbd5e1;
-      text-decoration: none;
-      margin: 0 10px;
-      cursor: pointer;
-    }
-
-    .footer-legal-links a:hover {
-      text-decoration: underline;
-    }
-
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.6);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      padding: 20px;
-    }
-
-    .modal-box {
-      background: #ffffff;
-      max-width: 500px;
-      width: 100%;
-      max-height: 80vh;
-      overflow-y: auto;
-      border-radius: 12px;
-      padding: 24px;
-      font-size: 13px;
-      color: #334155;
-      line-height: 1.65;
-      text-align: left;
-    }
-
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 8px;
-    }
-
-    .modal-header h4 {
-      margin: 0;
-      font-size: 16px;
-      color: #0b2240;
-    }
-
-    .modal-close {
-      background: none;
-      border: none;
-      font-size: 20px;
-      cursor: pointer;
-      color: #64748b;
-    }
-  </style>
-
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-HYCWKQH9PY"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag() { dataLayer.push(arguments); }
-    gtag('js', new Date());
-    gtag('config', 'G-HYCWKQH9PY');
-  </script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 </head>
-
 <body>
-  <header>
-    <h1>Aussie Life & Sports Pulse</h1>
-    <nav class="nav-links">
-      <a href="#about" onclick="openLegal('about')">About Us</a>
-      <a href="#contact" onclick="openLegal('contact')">Editorial</a>
-    </nav>
-  </header>
-
-  <div class="container">
-    <main class="main-box">
-      <div class="fun-image-section" id="imgSection">
-        <div class="image-wrapper">
-          <img src="Group.png" alt="Aussie Lifestyle Meme" onerror="document.getElementById('imgSection').style.display='none';">
-        </div>
-      </div>
-
-      <article class="hero-article">
-        <h2>How to Spend the Perfect Weekend in Melbourne: Brunch, Footy & Downtime</h2>
-        <div class="meta-info">Published by JC & Howl • 4 Mins Read • Updated 2026</div>
-        
-        <div class="content">
-          <h3>1. Start with a Proper Brew and Brunch</h3>
-          <p>There is no better way to kick off a Saturday morning than strolling down Fitzroy or South Yarra for a flat white and smashed avo. Melburnians take their coffee culture seriously, and finding that quiet local cafe sets the right relaxed tone before the afternoon excitement begins.</p>
-          
-          <h3>2. Afternoon Thrills: Catching the Footy with Mates</h3>
-          <p>As the arvo rolls in, the focus shifts to sport. Whether it’s heading to the MCG for an intense AFL clash or gathering at a local pub to watch the NRL on the big screen, footy is the social glue of the city. We catch up over a cold drink, dissect the team lineups, and share the buzz of every goal and tackle together.</p>
-          
-          <h3>3. Winding Down with Casual Digital Games</h3>
-          <p>After the match ends and the energy cools, Sunday evenings are all about winding down at home. Many locals enjoy switching on their consoles or tablets for some casual digital gaming. From sports simulation apps like AFL Evolution to strategy and trivia puzzles, it’s a fun, low-key way to unwind before the Monday workweek kicks off.</p>
-          
-          <h3>4. The Balance of City Living</h3>
-          <p>Great food, thrilling live sport, and relaxing digital downtime at home—that is the beauty of Melbourne living. It’s all about balance and enjoying the simple moments with good company.</p>
-        </div>
-      </article>
-    </main>
-  </div>
-
-  <footer>
-    <div class="footer-legal-links">
-      <a onclick="openLegal('privacy')">Privacy Policy</a> | 
-      <a onclick="openLegal('terms')">Terms of Service</a> | 
-      <a onclick="openLegal('contact')">Contact Desk</a>
-    </div>
-    <p>Aussie Life & Sports Pulse Ltd. © 2026 All Rights Reserved.</p>
-  </footer>
-
-  <div class="modal-overlay" id="legalModal">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h4 id="legalTitle">Privacy Policy</h4>
-        <button class="modal-close" onclick="closeLegal()">&times;</button>
-      </div>
-      <div id="legalBody"></div>
-    </div>
-  </div>
-
-  <script>
-    const legalTexts = {
-      privacy: `
-        <p><strong>Privacy Protocol</strong><br>Aussie Life & Sports Pulse operates as an independent lifestyle blog. We do not collect, store, or monetize any personally identifiable visitor information.</p>
-        <p><strong>Server Telemetry</strong><br>Standard temporary server logs (IP address, user-agent) are utilized exclusively for DDoS protection and performance optimization, purging on a routine automated schedule.</p>
-      `,
-      terms: `
-        <p><strong>Editorial Usage</strong><br>Content, reviews, and community insights published on this platform are intended strictly for cultural, informational, and leisure discussion.</p>
-        <p><strong>Intellectual Property</strong><br>All written articles and curated summaries are property of Aussie Life & Sports Pulse Studio. Uncredited syndication is strictly prohibited.</p>
-      `,
-      about: `
-        <p><strong>Our Mission</strong><br>Aussie Life & Sports Pulse is a boutique digital publication exploring the pulse of Australian city life, cafe culture, local sports fixtures, and balanced weekend recreation.</p>
-      `,
-      contact: `
-        <p><strong>Editorial Enquiries</strong><br>For technical feedback, content contributions, or general questions, reach our editorial desk at:<br><strong>desk@aussielife-pulse.org</strong></p>
-      `
-    };
-
-    function openLegal(type) {
-      const titles = { privacy: "Privacy Policy", terms: "Terms of Service", about: "About Our Publication", contact: "Contact Editorial" };
-      document.getElementById("legalTitle").innerText = titles[type];
-      document.getElementById("legalBody").innerHTML = legalTexts[type];
-      document.getElementById("legalModal").style.display = "flex";
-    }
-
-    function closeLegal() {
-      document.getElementById("legalModal").style.display = "none";
-    }
-  </script>
-
-  <script 
-    type="module" 
-    src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" 
-    integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" 
-    data-cf-beacon='{"version":"2024.11.0","token":"810287d46596452482f70522af1c460e","r":1,"spa":2}' 
-    crossorigin="anonymous">
-  </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"810287d46596452482f70522af1c460e","r":1,"spa":2}' crossorigin="anonymous"></script>
+<div id="figma-make-kit-root"></div>
+<script type="module">
+  import { stories } from 'virtual:figma-stories'
+  window.__FIGMA__ = Object.assign(window.__FIGMA__ ?? {}, { stories })
+  window.dispatchEvent(new CustomEvent('figma.ready'))
+</script>
 </body>
-</html>
+</html>`
+
+  return {
+    name: 'figma-make-kit',
+    apply: 'serve',
+    resolveId(id) {
+      if (id === VIRTUAL_ID) return RESOLVED_ID
+      return null
+    },
+    load(id) {
+      if (id !== RESOLVED_ID) return null
+      return STORIES_MODULE
+    },
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const url = req.url || ''
+        if (url.split('?')[0] !== ROUTE) return next()
+
+        try {
+          res.setHeader('Content-Type', 'text/html')
+          res.end(await server.transformIndexHtml(url, HTML_BOOTSTRAP))
+        } catch (err) {
+          next(err as Error)
+        }
+      })
+    },
+  }
+}
